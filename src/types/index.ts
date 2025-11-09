@@ -12,6 +12,21 @@ export interface ScanStatus {
   progress: number;
   status: 'idle' | 'scanning' | 'success' | 'error';
   message?: string;
+  deviceConnected?: boolean;
+  quality?: number;
 }
 
-export type ErrorType = 'read_failure' | 'no_scanner' | 'timeout' | null;
+export interface BiometricData {
+  template: Uint8Array;
+  quality: number;
+  capturedAt: Date;
+}
+
+export type ErrorType = 'read_failure' | 'no_scanner' | 'timeout' | 'device_disconnected' | 'poor_quality' | null;
+
+export interface AuthenticationResult {
+  success: boolean;
+  user?: User;
+  error?: string;
+  attempts?: number;
+}

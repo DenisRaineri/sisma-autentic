@@ -84,12 +84,22 @@ const FingerprintScanner: React.FC<FingerprintScannerProps> = ({
         <div className="text-center mb-4">
           <p className="text-gray-300">
             {scanStatus.isScanning 
-              ? 'Place your finger on the scanner' 
-              : scanStatus.message || 'Press the button to start scanning'}
+              ? 'Coloque o dedo no leitor DigitalPersona' 
+              : scanStatus.message || 'Pressione o botão para iniciar a leitura'}
           </p>
+          {!scanStatus.deviceConnected && (
+            <p className="text-red-400 text-sm mt-1">
+              ⚠️ Leitor DigitalPersona U.are.U 4000 não detectado
+            </p>
+          )}
+          {scanStatus.quality && (
+            <p className="text-blue-400 text-sm mt-1">
+              Qualidade: {scanStatus.quality}%
+            </p>
+          )}
           {scanStatus.status === 'error' && scanAttempts > 0 && (
             <p className="text-yellow-400 text-sm mt-1">
-              Attempt {scanAttempts} failed. Please try again.
+              Tentativa {scanAttempts} falhou. Tente novamente.
             </p>
           )}
         </div>
