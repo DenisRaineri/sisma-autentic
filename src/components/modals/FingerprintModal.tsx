@@ -11,13 +11,7 @@ interface FingerprintModalProps {
 }
 
 const FingerprintModal: React.FC<FingerprintModalProps> = ({ isOpen, onClose }) => {
-  const { 
-    scanStatus, 
-    resetScan, 
-    adminVerificationRequired, 
-    setAdminVerificationRequired,
-    scanAttempts
-  } = useApp();
+  const { scanStatus, resetScan, setAdminVerificationRequired, scanAttempts } = useApp();
   
   const [scanPhase, setScanPhase] = useState<'initial' | 'admin-verification' | 'success' | 'failure'>('initial');
   
@@ -26,7 +20,7 @@ const FingerprintModal: React.FC<FingerprintModalProps> = ({ isOpen, onClose }) 
       setScanPhase('initial');
       resetScan();
     }
-  }, [isOpen]);
+  }, [isOpen, resetScan]);
   
   useEffect(() => {
     if (scanStatus.status === 'success' && scanPhase === 'admin-verification') {

@@ -18,11 +18,11 @@ const FingerprintScanner: React.FC<FingerprintScannerProps> = ({
   
   useEffect(() => {
     if (autoStart) {
-      startScan();
+      void startScan();
     }
-    
+
     return () => resetScan();
-  }, [autoStart]);
+  }, [autoStart, startScan, resetScan]);
   
   useEffect(() => {
     if (scanStatus.status === 'success' || scanStatus.status === 'error') {
@@ -92,16 +92,16 @@ const FingerprintScanner: React.FC<FingerprintScannerProps> = ({
               ⚠️ Leitor DigitalPersona U.are.U 4000 não detectado
             </p>
           )}
-          {scanStatus.quality && (
+          {scanStatus.quality != null ? (
             <p className="text-blue-400 text-sm mt-1">
               Qualidade: {scanStatus.quality}%
             </p>
-          )}
-          {scanStatus.status === 'error' && scanAttempts > 0 && (
+          ) : null}
+          {scanStatus.status === 'error' && scanAttempts > 0 ? (
             <p className="text-yellow-400 text-sm mt-1">
               Tentativa {scanAttempts} falhou. Tente novamente.
             </p>
-          )}
+          ) : null}
         </div>
       )}
       
@@ -111,7 +111,7 @@ const FingerprintScanner: React.FC<FingerprintScannerProps> = ({
           variant="primary"
           icon={<Fingerprint size={16} />}
         >
-          {scanStatus.status === 'error' ? 'Try Again' : 'Start Scan'}
+          {scanStatus.status === 'error' ? 'Tentar novamente' : 'Iniciar leitura'}
         </Button>
       )}
     </div>

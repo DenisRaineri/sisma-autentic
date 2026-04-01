@@ -6,6 +6,11 @@ export interface DatabaseUser extends User {
   lastAccess?: Date;
 }
 
+/** Dados para criar usuário (sem campos gerados pelo serviço). */
+export type CreateUserPayload = Omit<DatabaseUser, 'id' | 'createdAt' | 'registered'> & {
+  capturedAt?: Date;
+};
+
 export class DatabaseService {
   private static instance: DatabaseService;
   private users: Map<string, DatabaseUser> = new Map();
@@ -40,13 +45,14 @@ export class DatabaseService {
     this.users.set(adminUser.id, adminUser);
   }
 
-  async createUser(userData: Omit<DatabaseUser, 'id' | 'createdAt' | 'registered'>): Promise<string> {
+  async createUser(userData: CreateUserPayload): Promise<string> {
+    const { capturedAt, ...rest } = userData;
     const id = `user-${Date.now()}`;
     const user: DatabaseUser = {
-      ...userData,
+      ...rest,
       id,
       registered: new Date().toISOString(),
-      createdAt: new Date()
+      createdAt: capturedAt ?? new Date(),
     };
 
     this.users.set(id, user);
@@ -102,7 +108,8 @@ export class DatabaseService {
   }
 
   private compareTemplates(stored: Uint8Array, scanned: Uint8Array): boolean {
-    // Simulação simples - em produção usar algoritmo do DigitalPersona
+    void stored;
+    void scanned;
     return Math.random() > 0.3;
   }
 }

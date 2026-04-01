@@ -1,4 +1,11 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, {
+  createContext,
+  useContext,
+  useState,
+  useEffect,
+  useCallback,
+  useRef,
+} from 'react';
 import { User, ScanStatus, ErrorType, AuthenticationResult, BiometricData } from '../types';
 import { BiometricService } from '../services/BiometricService';
 import { DatabaseService } from '../services/DatabaseService';
@@ -13,6 +20,8 @@ interface AppContextType {
   isErrorModalOpen: boolean;
   adminVerificationRequired: boolean;
   scanAttempts: number;
+  /** Última captura bem-sucedida do leitor (para cadastro com template real). */
+  lastBiometricCapture: BiometricData | null;
   
   // Actions
   setUsers: React.Dispatch<React.SetStateAction<User[]>>;
@@ -33,6 +42,7 @@ interface AppContextType {
   resetScan: () => void;
   authenticateUser: (username: string) => Promise<AuthenticationResult>;
   initializeServices: () => Promise<boolean>;
+  clearLastBiometricCapture: () => void;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
@@ -52,57 +62,66 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [isErrorModalOpen, setIsErrorModalOpen] = useState(false);
   const [adminVerificationRequired, setAdminVerificationRequired] = useState(false);
   const [scanAttempts, setScanAttempts] = useState(0);
+  const [lastBiometricCapture, setLastBiometricCapture] = useState<BiometricData | null>(null);
+
+  const progressIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const biometricService = BiometricService.getInstance();
   const databaseService = DatabaseService.getInstance();
 
-  const initializeServices = async (): Promise<boolean> => {
+  const clearLastBiometricCapture = useCallback(() => {
+    setLastBiometricCapture(null);
+  }, []);
+
+  const initializeServices = useCallback(async (): Promise<boolean> => {
     try {
       await databaseService.initialize();
       const biometricInitialized = await biometricService.initialize();
-      
+
       setScanStatus(prev => ({
         ...prev,
-        deviceConnected: biometricInitialized
+        deviceConnected: biometricInitialized,
       }));
-      
+
       if (!biometricInitialized) {
         setErrorType('no_scanner');
       }
-      
-      // Carregar usuários do banco
+
       const dbUsers = await databaseService.getAllUsers();
-      setUsers(dbUsers.map(u => ({
-        id: u.id,
-        name: u.name,
-        username: u.username,
-        accessLevel: u.accessLevel,
-        fingerprintId: u.fingerprintId,
-        registered: u.registered
-      })));
-      
+      setUsers(
+        dbUsers.map(u => ({
+          id: u.id,
+          name: u.name,
+          username: u.username,
+          accessLevel: u.accessLevel,
+          fingerprintId: u.fingerprintId,
+          registered: u.registered,
+        }))
+      );
+
       return biometricInitialized;
     } catch (error) {
       console.error('Erro ao inicializar serviços:', error);
       return false;
     }
-  };
+  }, [biometricService, databaseService]);
 
   const addUser = async (user: Omit<User, 'id' | 'registered'>, biometricData: BiometricData): Promise<boolean> => {
     try {
       const userId = await databaseService.createUser({
         ...user,
         fingerprintTemplate: biometricData.template,
-        createdAt: biometricData.capturedAt
+        capturedAt: biometricData.capturedAt,
       });
-      
+
       const newUser: User = {
         ...user,
         id: userId,
-        registered: new Date().toISOString()
+        registered: new Date().toISOString(),
       };
-      
+
       setUsers(prev => [...prev, newUser]);
+      setLastBiometricCapture(null);
       return true;
     } catch (error) {
       console.error('Erro ao adicionar usuário:', error);
@@ -138,46 +157,54 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   };
 
-  const startScan = async (): Promise<void> => {
+  const startScan = useCallback(async (): Promise<void> => {
     if (!biometricService.isDeviceConnected()) {
       setErrorType('device_disconnected');
       setIsErrorModalOpen(true);
       return;
     }
 
-    setScanStatus({
+    if (progressIntervalRef.current) {
+      clearInterval(progressIntervalRef.current);
+      progressIntervalRef.current = null;
+    }
+
+    setScanStatus(prev => ({
+      ...prev,
       isScanning: true,
       progress: 0,
       status: 'scanning',
-      deviceConnected: true
-    });
+      deviceConnected: true,
+    }));
 
-    // Progress simulation
-    const interval = setInterval(() => {
+    progressIntervalRef.current = setInterval(() => {
       setScanStatus(prev => {
         if (prev.progress >= 100) {
-          clearInterval(interval);
           return prev;
         }
         return {
           ...prev,
-          progress: prev.progress + 2
+          progress: prev.progress + 2,
         };
       });
     }, 50);
 
     try {
       const result = await biometricService.scanFingerprint();
-      clearInterval(interval);
-      
+
       if (result.success && result.template) {
+        setLastBiometricCapture({
+          template: result.template.template,
+          quality: result.quality ?? result.template.quality,
+          capturedAt: new Date(),
+        });
         setScanStatus({
           isScanning: false,
           progress: 100,
           status: 'success',
           message: 'Impressão digital capturada com sucesso',
           quality: result.quality,
-          deviceConnected: true
+          deviceConnected: true,
         });
       } else {
         setScanAttempts(prev => prev + 1);
@@ -186,36 +213,41 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           progress: 0,
           status: 'error',
           message: result.error || 'Falha na captura',
-          deviceConnected: true
+          deviceConnected: true,
         });
-        
+
         if (result.error?.includes('qualidade')) {
           setErrorType('poor_quality');
         } else {
           setErrorType('read_failure');
         }
       }
-    } catch (error) {
-      clearInterval(interval);
-      setScanStatus({
+    } catch {
+      setScanStatus(prev => ({
         isScanning: false,
         progress: 0,
         status: 'error',
         message: 'Erro durante a captura',
-        deviceConnected: false
-      });
+        deviceConnected: prev.deviceConnected ?? false,
+      }));
       setErrorType('read_failure');
+    } finally {
+      if (progressIntervalRef.current) {
+        clearInterval(progressIntervalRef.current);
+        progressIntervalRef.current = null;
+      }
     }
-  };
+  }, [biometricService]);
 
-  const resetScan = () => {
-    setScanStatus({
+  const resetScan = useCallback(() => {
+    setScanStatus(prev => ({
       isScanning: false,
       progress: 0,
-      status: 'idle'
-    });
+      status: 'idle',
+      deviceConnected: prev.deviceConnected,
+    }));
     setErrorType(null);
-  };
+  }, []);
 
   const authenticateUser = async (username: string): Promise<AuthenticationResult> => {
     try {
@@ -226,10 +258,15 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
       const scanResult = await biometricService.scanFingerprint();
       if (!scanResult.success || !scanResult.template) {
-        return { 
-          success: false, 
+        let nextAttempts = 0;
+        setScanAttempts(prev => {
+          nextAttempts = prev + 1;
+          return nextAttempts;
+        });
+        return {
+          success: false,
           error: scanResult.error || 'Falha na captura biométrica',
-          attempts: scanAttempts + 1
+          attempts: nextAttempts,
         };
       }
 
@@ -246,18 +283,22 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           username: user.username,
           accessLevel: user.accessLevel,
           fingerprintId: user.fingerprintId,
-          registered: user.registered
+          registered: user.registered,
         });
         setScanAttempts(0);
         return { success: true, user };
-      } else {
-        setScanAttempts(prev => prev + 1);
-        return { 
-          success: false, 
-          error: 'Impressão digital não confere',
-          attempts: scanAttempts + 1
-        };
       }
+
+      let nextAttempts = 0;
+      setScanAttempts(prev => {
+        nextAttempts = prev + 1;
+        return nextAttempts;
+      });
+      return {
+        success: false,
+        error: 'Impressão digital não confere',
+        attempts: nextAttempts,
+      };
     } catch (error) {
       console.error('Erro na autenticação:', error);
       return { success: false, error: 'Erro interno do sistema' };
@@ -265,8 +306,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   useEffect(() => {
-    initializeServices();
-  }, []);
+    void initializeServices();
+  }, [initializeServices]);
 
   return (
     <AppContext.Provider value={{
@@ -279,6 +320,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       isErrorModalOpen,
       adminVerificationRequired,
       scanAttempts,
+      lastBiometricCapture,
       setUsers,
       setCurrentUser,
       setScanStatus,
@@ -294,7 +336,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       startScan,
       resetScan,
       authenticateUser,
-      initializeServices
+      initializeServices,
+      clearLastBiometricCapture,
     }}>
       {children}
     </AppContext.Provider>

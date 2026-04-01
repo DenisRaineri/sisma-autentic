@@ -1,3 +1,14 @@
+/**
+ * Simulação do leitor DigitalPersona para desenvolvimento e demonstração.
+ * Para integração real, consulte `README-INTEGRACAO.md` e substitua as implementações.
+ */
+const MOCK_DEVICE_CHECK_MS = 1000;
+const MOCK_SCAN_MS = 3000;
+const MOCK_VERIFY_MS = 1000;
+const DEVICE_CONNECT_FAIL_RATE = 0.1;
+const MIN_ACCEPT_QUALITY = 30;
+const VERIFY_MATCH_THRESHOLD = 0.7;
+
 export interface BiometricTemplate {
   id: string;
   template: Uint8Array;
@@ -37,8 +48,8 @@ export class BiometricService {
   private async checkDeviceConnection(): Promise<boolean> {
     return new Promise((resolve) => {
       setTimeout(() => {
-        resolve(Math.random() > 0.1);
-      }, 1000);
+        resolve(Math.random() > DEVICE_CONNECT_FAIL_RATE);
+      }, MOCK_DEVICE_CHECK_MS);
     });
   }
 
@@ -53,37 +64,39 @@ export class BiometricService {
     return new Promise((resolve) => {
       setTimeout(() => {
         const quality = Math.floor(Math.random() * 100);
-        
-        if (quality < 30) {
+
+        if (quality < MIN_ACCEPT_QUALITY) {
           resolve({
             success: false,
             error: 'Qualidade da impressão digital muito baixa',
-            quality
+            quality,
           });
         } else {
           const template = new Uint8Array(256);
           crypto.getRandomValues(template);
-          
+
           resolve({
             success: true,
             template: {
               id: `template-${Date.now()}`,
               template,
-              quality
+              quality,
             },
-            quality
+            quality,
           });
         }
-      }, 3000);
+      }, MOCK_SCAN_MS);
     });
   }
 
   async verifyFingerprint(storedTemplate: Uint8Array, scannedTemplate: Uint8Array): Promise<boolean> {
+    void storedTemplate;
+    void scannedTemplate;
     return new Promise((resolve) => {
       setTimeout(() => {
         const similarity = Math.random();
-        resolve(similarity > 0.7);
-      }, 1000);
+        resolve(similarity > VERIFY_MATCH_THRESHOLD);
+      }, MOCK_VERIFY_MS);
     });
   }
 

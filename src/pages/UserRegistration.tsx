@@ -1,7 +1,17 @@
-import React, { useState, useEffect } from 'react';
-import { 
-  Users, UserPlus, Pencil, Trash2, Check, X, ChevronDown, Fingerprint, Filter, Search,
-  ArrowUpDown, Shield, Save, AlertCircle
+import React, { useState } from 'react';
+import {
+  Users,
+  UserPlus,
+  Pencil,
+  Trash2,
+  Check,
+  X,
+  Fingerprint,
+  Search,
+  ArrowUpDown,
+  Shield,
+  Save,
+  AlertCircle,
 } from 'lucide-react';
 import Button from '../components/common/Button';
 import Input from '../components/common/Input';
@@ -12,7 +22,8 @@ import { User } from '../types';
 import { getRandomFingerprint } from '../utils/mockData';
 
 const UserRegistration: React.FC = () => {
-  const { users, addUser, updateUser, deleteUser } = useApp();
+  const { users, addUser, updateUser, deleteUser, lastBiometricCapture, clearLastBiometricCapture } =
+    useApp();
   
   const [isAddingUser, setIsAddingUser] = useState(false);
   const [editingUserId, setEditingUserId] = useState<string | null>(null);
@@ -30,15 +41,16 @@ const UserRegistration: React.FC = () => {
   });
   
   const [isScanning, setIsScanning] = useState(false);
-  const [showSuccess, setShowSuccess] = useState<string | null>(null);
-  
+  const [banner, setBanner] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+
   const resetForm = () => {
     setFormData({
       name: '',
       username: '',
       accessLevel: 'Operator',
-      fingerprintId: ''
+      fingerprintId: '',
     });
+    clearLastBiometricCapture();
   };
   
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
@@ -59,40 +71,58 @@ const UserRegistration: React.FC = () => {
     setIsScanning(false);
   };
   
-  const handleAddSubmit = (e: React.FormEvent) => {
+  const handleAddSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
-    addUser({
-      name: formData.name,
-      username: formData.username,
-      accessLevel: formData.accessLevel as User['accessLevel'],
-      fingerprintId: formData.fingerprintId
-    });
-    
-    setShowSuccess('User added successfully!');
-    setTimeout(() => setShowSuccess(null), 3000);
-    
-    setIsAddingUser(false);
-    resetForm();
-  };
-  
-  const handleEditSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    
-    if (editingUserId) {
-      updateUser(editingUserId, {
+
+    if (!lastBiometricCapture) {
+      setBanner({
+        type: 'error',
+        text: 'Conclua a leitura biométrica antes de salvar.',
+      });
+      setTimeout(() => setBanner(null), 4000);
+      return;
+    }
+
+    const ok = await addUser(
+      {
         name: formData.name,
         username: formData.username,
         accessLevel: formData.accessLevel as User['accessLevel'],
-        fingerprintId: formData.fingerprintId
-      });
-      
-      setShowSuccess('User updated successfully!');
-      setTimeout(() => setShowSuccess(null), 3000);
-      
+        fingerprintId: formData.fingerprintId,
+      },
+      lastBiometricCapture
+    );
+
+    if (ok) {
+      setBanner({ type: 'success', text: 'Usuário adicionado com sucesso!' });
+      setIsAddingUser(false);
+      resetForm();
+    } else {
+      setBanner({ type: 'error', text: 'Não foi possível adicionar o usuário.' });
+    }
+    setTimeout(() => setBanner(null), 3000);
+  };
+
+  const handleEditSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    if (!editingUserId) return;
+
+    const ok = await updateUser(editingUserId, {
+      name: formData.name,
+      username: formData.username,
+      accessLevel: formData.accessLevel as User['accessLevel'],
+      fingerprintId: formData.fingerprintId,
+    });
+
+    if (ok) {
+      setBanner({ type: 'success', text: 'Usuário atualizado com sucesso!' });
       setEditingUserId(null);
       resetForm();
+    } else {
+      setBanner({ type: 'error', text: 'Não foi possível atualizar o usuário.' });
     }
+    setTimeout(() => setBanner(null), 3000);
   };
   
   const handleEditClick = (user: User) => {
@@ -110,14 +140,18 @@ const UserRegistration: React.FC = () => {
     setDeletingUserId(userId);
   };
   
-  const confirmDelete = () => {
-    if (deletingUserId) {
-      deleteUser(deletingUserId);
-      setDeletingUserId(null);
-      
-      setShowSuccess('User deleted successfully!');
-      setTimeout(() => setShowSuccess(null), 3000);
+  const confirmDelete = async () => {
+    if (!deletingUserId) return;
+
+    const ok = await deleteUser(deletingUserId);
+    setDeletingUserId(null);
+
+    if (ok) {
+      setBanner({ type: 'success', text: 'Usuário excluído com sucesso!' });
+    } else {
+      setBanner({ type: 'error', text: 'Não foi possível excluir o usuário.' });
     }
+    setTimeout(() => setBanner(null), 3000);
   };
   
   const cancelDelete = () => {
@@ -127,6 +161,7 @@ const UserRegistration: React.FC = () => {
   const cancelEdit = () => {
     setEditingUserId(null);
     resetForm();
+    setBanner(null);
   };
   
   const handleAddNewClick = () => {
@@ -138,6 +173,7 @@ const UserRegistration: React.FC = () => {
   const cancelAdd = () => {
     setIsAddingUser(false);
     resetForm();
+    setBanner(null);
   };
   
   // Sort and filter users
@@ -186,7 +222,7 @@ const UserRegistration: React.FC = () => {
             <div className="bg-blue-900/20 p-2 rounded-lg">
               <Users size={28} className="text-blue-400" />
             </div>
-            <h1 className="text-3xl font-bold text-white">User Registration</h1>
+            <h1 className="text-3xl font-bold text-white">Cadastro de usuários</h1>
           </div>
           
           {!isAddingUser && !editingUserId && (
@@ -195,15 +231,21 @@ const UserRegistration: React.FC = () => {
               variant="primary"
               icon={<UserPlus size={16} />}
             >
-              Add New User
+              Novo usuário
             </Button>
           )}
         </div>
         
-        {showSuccess && (
-          <div className="mb-6 p-3 bg-green-900/20 border border-green-800 rounded-lg text-green-400 flex items-center gap-2">
-            <Check size={16} />
-            <span>{showSuccess}</span>
+        {banner && (
+          <div
+            className={`mb-6 p-3 rounded-lg flex items-center gap-2 border ${
+              banner.type === 'success'
+                ? 'bg-green-900/20 border-green-800 text-green-400'
+                : 'bg-red-900/20 border-red-800 text-red-400'
+            }`}
+          >
+            {banner.type === 'success' ? <Check size={16} /> : <AlertCircle size={16} />}
+            <span>{banner.text}</span>
           </div>
         )}
         
@@ -214,12 +256,12 @@ const UserRegistration: React.FC = () => {
               {editingUserId ? (
                 <>
                   <Pencil size={20} />
-                  <span>Edit User</span>
+                  <span>Editar usuário</span>
                 </>
               ) : (
                 <>
                   <UserPlus size={20} />
-                  <span>Add New User</span>
+                  <span>Novo usuário</span>
                 </>
               )}
             </h2>
@@ -231,7 +273,7 @@ const UserRegistration: React.FC = () => {
                   id="name"
                   value={formData.name}
                   onChange={handleInputChange}
-                  placeholder="Enter user's full name"
+                  placeholder="Nome completo"
                   required
                 />
                 
@@ -240,7 +282,7 @@ const UserRegistration: React.FC = () => {
                   id="username"
                   value={formData.username}
                   onChange={handleInputChange}
-                  placeholder="Enter username"
+                  placeholder="Nome de usuário"
                   required
                 />
                 
@@ -257,7 +299,7 @@ const UserRegistration: React.FC = () => {
               <div className="border-t border-gray-800 pt-6 mb-6">
                 <h3 className="text-lg font-medium mb-4 flex items-center gap-2 text-white">
                   <Fingerprint size={18} className="text-blue-400" />
-                  <span>Fingerprint Registration</span>
+                  <span>Registro biométrico</span>
                 </h3>
                 
                 <div className="flex flex-col md:flex-row gap-6 items-center">
@@ -269,14 +311,14 @@ const UserRegistration: React.FC = () => {
                             <div className="mb-2">
                               <Fingerprint size={48} className="mx-auto text-green-400" />
                             </div>
-                            <p className="text-white mb-2">Fingerprint Registered</p>
+                            <p className="text-white mb-2">Biometria registrada</p>
                             <p className="text-sm text-gray-400 mb-4">ID: {formData.fingerprintId}</p>
                             <Button 
                               variant="outline" 
                               size="sm" 
                               onClick={handleScanStart}
                             >
-                              Replace Fingerprint
+                              Substituir biometria
                             </Button>
                           </>
                         ) : (
@@ -284,13 +326,13 @@ const UserRegistration: React.FC = () => {
                             <div className="mb-2">
                               <Fingerprint size={48} className="mx-auto text-gray-400" />
                             </div>
-                            <p className="text-gray-300 mb-4">No fingerprint registered</p>
+                            <p className="text-gray-300 mb-4">Nenhuma biometria registrada</p>
                             <Button 
                               variant="primary" 
                               size="sm" 
                               onClick={handleScanStart}
                             >
-                              Register Fingerprint
+                              Registrar biometria
                             </Button>
                           </>
                         )}
@@ -298,7 +340,7 @@ const UserRegistration: React.FC = () => {
                     ) : (
                       <div className="bg-gray-800 p-5 rounded-lg border border-gray-700">
                         <h4 className="text-center text-lg mb-4">
-                          {formData.fingerprintId ? 'Replace Fingerprint' : 'Register Fingerprint'}
+                          {formData.fingerprintId ? 'Substituir biometria' : 'Registrar biometria'}
                         </h4>
                         <FingerprintScanner onScanComplete={handleScanComplete} />
                       </div>
@@ -307,23 +349,23 @@ const UserRegistration: React.FC = () => {
                   
                   <div className="w-full md:w-1/2">
                     <div className="bg-gray-800/50 p-4 rounded-lg text-sm text-gray-300">
-                      <h4 className="font-medium text-blue-400 mb-2">Access Level Information</h4>
+                      <h4 className="font-medium text-blue-400 mb-2">Níveis de acesso</h4>
                       <ul className="space-y-3">
                         <li className="flex items-start gap-2">
                           <span className="inline-block h-5 w-5 rounded-full bg-red-900/50 text-red-400 text-xs flex items-center justify-center">A</span>
-                          <span><strong className="text-red-400">Administrator:</strong> Full system access</span>
+                          <span><strong className="text-red-400">Administrator:</strong> acesso total ao sistema</span>
                         </li>
                         <li className="flex items-start gap-2">
                           <span className="inline-block h-5 w-5 rounded-full bg-amber-900/50 text-amber-400 text-xs flex items-center justify-center">S</span>
-                          <span><strong className="text-amber-400">Supervisor:</strong> User management and reports</span>
+                          <span><strong className="text-amber-400">Supervisor:</strong> gestão e relatórios</span>
                         </li>
                         <li className="flex items-start gap-2">
                           <span className="inline-block h-5 w-5 rounded-full bg-blue-900/50 text-blue-400 text-xs flex items-center justify-center">O</span>
-                          <span><strong className="text-blue-400">Operator:</strong> Standard system operations</span>
+                          <span><strong className="text-blue-400">Operator:</strong> operações padrão</span>
                         </li>
                         <li className="flex items-start gap-2">
                           <span className="inline-block h-5 w-5 rounded-full bg-green-900/50 text-green-400 text-xs flex items-center justify-center">G</span>
-                          <span><strong className="text-green-400">Guest:</strong> Limited, read-only access</span>
+                          <span><strong className="text-green-400">Guest:</strong> acesso limitado (somente leitura)</span>
                         </li>
                       </ul>
                     </div>
@@ -337,7 +379,7 @@ const UserRegistration: React.FC = () => {
                   type="button"
                   onClick={editingUserId ? cancelEdit : cancelAdd}
                 >
-                  Cancel
+                  Cancelar
                 </Button>
                 <Button 
                   variant="primary" 
@@ -345,7 +387,7 @@ const UserRegistration: React.FC = () => {
                   icon={<Save size={16} />}
                   disabled={!formData.name || !formData.username || !formData.fingerprintId}
                 >
-                  {editingUserId ? 'Update User' : 'Add User'}
+                  {editingUserId ? 'Atualizar usuário' : 'Adicionar usuário'}
                 </Button>
               </div>
             </form>
@@ -359,7 +401,7 @@ const UserRegistration: React.FC = () => {
               <Search size={18} className="absolute left-3 text-gray-400" />
               <input
                 type="text"
-                placeholder="Search users..."
+                placeholder="Buscar usuários..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 className="bg-gray-800 border border-gray-700 rounded-lg py-2 pl-10 pr-4 w-full
@@ -375,7 +417,7 @@ const UserRegistration: React.FC = () => {
                   value={filterAccessLevel}
                   onChange={(e) => setFilterAccessLevel(e.target.value)}
                   options={[
-                    { value: '', label: 'All Access Levels' },
+                    { value: '', label: 'Todos os níveis' },
                     ...accessLevelOptions
                   ]}
                   placeholder="Filter by access level"
@@ -388,8 +430,8 @@ const UserRegistration: React.FC = () => {
             <table className="w-full text-left">
               <thead className="bg-gray-800 text-gray-400 text-sm">
                 <tr>
-                  <th className="px-4 py-3">Name</th>
-                  <th className="px-4 py-3">Username</th>
+                  <th className="px-4 py-3">Nome</th>
+                  <th className="px-4 py-3">Usuário</th>
                   <th className="px-4 py-3">
                     <button 
                       className="flex items-center gap-1 hover:text-white"
@@ -402,7 +444,7 @@ const UserRegistration: React.FC = () => {
                         }
                       }}
                     >
-                      Access Level
+                      Nível de acesso
                       <ArrowUpDown size={14} />
                     </button>
                   </th>
@@ -418,11 +460,11 @@ const UserRegistration: React.FC = () => {
                         }
                       }}
                     >
-                      Registered
+                      Cadastro
                       <ArrowUpDown size={14} />
                     </button>
                   </th>
-                  <th className="px-4 py-3 text-right">Actions</th>
+                  <th className="px-4 py-3 text-right">Ações</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-800">
@@ -431,7 +473,7 @@ const UserRegistration: React.FC = () => {
                     <td colSpan={5} className="px-4 py-8 text-center text-gray-400">
                       <div className="flex flex-col items-center">
                         <AlertCircle size={24} className="mb-2" />
-                        <p>No users found matching your criteria</p>
+                        <p>Nenhum usuário encontrado com os filtros atuais</p>
                       </div>
                     </td>
                   </tr>
@@ -451,7 +493,7 @@ const UserRegistration: React.FC = () => {
                       <td className="px-4 py-3 text-right">
                         {deletingUserId === user.id ? (
                           <div className="flex items-center justify-end gap-2">
-                            <span className="text-sm text-gray-400">Confirm delete?</span>
+                            <span className="text-sm text-gray-400">Confirmar exclusão?</span>
                             <Button
                               variant="danger"
                               size="sm"
@@ -477,7 +519,7 @@ const UserRegistration: React.FC = () => {
                               icon={<Pencil size={14} />}
                               onClick={() => handleEditClick(user)}
                             >
-                              Edit
+                              Editar
                             </Button>
                             <Button
                               variant="danger"
@@ -485,7 +527,7 @@ const UserRegistration: React.FC = () => {
                               icon={<Trash2 size={14} />}
                               onClick={() => handleDeleteClick(user.id)}
                             >
-                              Delete
+                              Excluir
                             </Button>
                           </div>
                         )}
@@ -498,14 +540,16 @@ const UserRegistration: React.FC = () => {
           </div>
           
           <div className="p-4 border-t border-gray-800 text-sm text-gray-400">
-            Showing {filteredUsers.length} of {users.length} users
+            Exibindo {filteredUsers.length} de {users.length} usuários
           </div>
         </div>
         
         <div className="mt-6 bg-blue-900/10 border border-blue-900/30 rounded-lg p-4 text-sm text-blue-300">
           <p className="flex items-center gap-1.5">
             <Shield size={16} />
-            <span>User management requires administrator privileges. All operations are logged for security purposes.</span>
+            <span>
+              A gestão de usuários exige privilégios de administrador. As operações são registradas para auditoria.
+            </span>
           </p>
         </div>
       </div>

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Fingerprint, Check, X } from 'lucide-react';
+import { Check } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import { BiometricData } from '../types';
 import Button from './common/Button';

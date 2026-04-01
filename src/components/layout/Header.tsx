@@ -21,9 +21,9 @@ const Header: React.FC = () => {
   };
   
   const navItems = [
-    { path: '/', label: 'Home', icon: <Home size={18} /> },
-    { path: '/admin-registration', label: 'Admin Registration', icon: <UserPlus size={18} /> },
-    { path: '/user-registration', label: 'User Registration', icon: <Users size={18} /> }
+    { path: '/', label: 'Início', icon: <Home size={18} /> },
+    { path: '/admin-registration', label: 'Cadastro admin', icon: <UserPlus size={18} /> },
+    { path: '/user-registration', label: 'Usuários', icon: <Users size={18} /> },
   ];
   
   return (
@@ -36,7 +36,7 @@ const Header: React.FC = () => {
             onClick={closeMenu}
           >
             <Fingerprint size={24} />
-            <span>SecurePrint</span>
+            <span>SISMA-AUTENTIC</span>
           </Link>
           
           {/* Desktop Navigation */}
@@ -61,7 +61,7 @@ const Header: React.FC = () => {
                         text-gray-300 hover:text-blue-400 hover:bg-gray-800/50"
             >
               <Info size={18} />
-              <span>About</span>
+              <span>Sobre</span>
             </button>
           </nav>
           
@@ -104,7 +104,7 @@ const Header: React.FC = () => {
                         text-gray-300 hover:text-blue-400 hover:bg-gray-800/50 text-left"
             >
               <Info size={18} />
-              <span>About</span>
+              <span>Sobre</span>
             </button>
           </div>
         </nav>

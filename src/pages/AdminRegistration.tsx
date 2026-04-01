@@ -4,11 +4,9 @@ import Input from '../components/common/Input';
 import Select from '../components/common/Select';
 import Button from '../components/common/Button';
 import FingerprintScanner from '../components/FingerprintScanner';
-import { useApp } from '../context/AppContext';
 import { getRandomFingerprint } from '../utils/mockData';
 
 const AdminRegistration: React.FC = () => {
-  const { scanStatus, resetScan, startScan } = useApp();
   
   const [formData, setFormData] = useState({
     name: '',
