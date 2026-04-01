@@ -131,14 +131,6 @@ Não há suíte de testes (Jest/Vitest) configurada no momento. A validação é
 - `getUserByUsername`, `getAllUsers`, `updateUser`, `deleteUser`, `updateLastAccess`
 - `findUserByFingerprintTemplate` — busca simulada.
 
----
-
-## Trabalhos futuros (sugestões)
-
-- Substituir simulações pelas APIs reais do DigitalPersona.
-- Persistir usuários e metadados em SQLite/PostgreSQL.
-- Sessão com timeout, trilha de auditoria persistida e testes automatizados.
-- Empacotamento desktop (por exemplo Electron) apenas se fizer sentido ao integrar drivers nativos.
 
 ---
 
